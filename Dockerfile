@@ -1,18 +1,12 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
-WORKDIR  /go/src/github.com/openshift/eventrouter
-USER 0
-
-COPY ./go.mod ./go.sum ./
-RUN go mod download
-COPY Makefile *.go ./
+FROM cgr.dev/chainguard/go:latest AS builder
+WORKDIR /go/src/github.com/openshift/eventrouter
+COPY *.go go.mod go.sum ./
 COPY sinks ./sinks
 
-RUN make build
+RUN CGO_ENABLED=0 go build -mod=mod -o eventrouter
+RUN chmod +x eventrouter
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal
-
-ARG BUILD_VERSION=0.5.0
-USER 1000
-COPY --from=builder /go/src/github.com/openshift/eventrouter/eventrouter /bin/eventrouter
-CMD ["/bin/eventrouter", "-v", "3", "-logtostderr"]
-LABEL version="v${BUILD_VERSION}"
+FROM cgr.dev/chainguard/static:latest
+COPY --from=builder /go/src/github.com/openshift/eventrouter/eventrouter /eventrouter
+CMD ["/eventrouter", "-v", "3", "-logtostderr"]
+LABEL version=release-5.9
